@@ -43,8 +43,25 @@ variableMesh(const InputParameters & parameters)
 {
   auto & problem =
       cast_ref<MFEMProblem &>(*parameters.getCheckedPointerParam<SubProblem *>("_subproblem"));
-  return const_cast<mfem::ParMesh &>(
-      problem.getMFEMVariableMesh(parameters.get<VariableName>("variable")));
+  auto & variables = parameters.get<std::vector<VariableName>>("variables");
+  auto & first_variable = variables[0];
+  auto & mesh = const_cast<mfem::ParMesh &>(problem.getMFEMVariableMesh(first_variable));
+
+  // ensure that all variables are on the same mesh
+  for (const auto & variable : variables)
+  {
+    if (&const_cast<mfem::ParMesh &>(problem.getMFEMVariableMesh(variable)) != &mesh)
+    {
+      mooseError("In MFEMVariableSamplerBase:"
+                 " all variables must be on the same mesh. Found: ",
+                 variable,
+                 " which is not on the same mesh as: ",
+                 first_variable,
+                 ".");
+    }
+  }
+
+  return mesh;
 }
 }
 
@@ -52,8 +69,8 @@ InputParameters
 MFEMVariableSamplerBase::validParams()
 {
   InputParameters params = MFEMSamplerBase::validParams();
-  MFEMExecutedObject::addRequiredDependencyParam<VariableName>(
-      params, "variable", "The variable that this VectorPostprocessor samples");
+  MFEMExecutedObject::addRequiredDependencyParam<std::vector<VariableName>>(
+      params, "variables", "The variables that this VectorPostprocessor samples");
   MooseEnum avg_type(getL2AverageTypeOptions(), "ARITHMETIC");
   params.addParam<MooseEnum>("side_interpolation_type",
                              avg_type,
@@ -64,7 +81,7 @@ MFEMVariableSamplerBase::validParams()
 MFEMVariableSamplerBase::MFEMVariableSamplerBase(const InputParameters & parameters,
                                                  const std::vector<Point> & points)
   : MFEMSamplerBase(parameters, points, variableMesh(parameters)),
-    _var_name(getParam<VariableName>("variable"))
+    _var_names(getParam<std::vector<VariableName>>("variables"))
 {
   _finder.SetL2AvgType(static_cast<mfem::FindPointsGSLIB::AvgType>(
       getParam<MooseEnum>("side_interpolation_type").getEnum<L2AverageType>()));

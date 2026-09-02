@@ -37,8 +37,8 @@ public:
 protected:
   MFEMVariableSamplerBase(const InputParameters & parameters, const std::vector<Point> & points);
 
-  /// Name of the variable being sampled.
-  const VariableName _var_name;
+  /// Names of the variables being sampled.
+  const std::vector<VariableName> _var_names;
 
 private:
   /// Return the continuity type of the sampled variable's finite element collection.
